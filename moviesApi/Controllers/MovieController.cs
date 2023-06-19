@@ -1,7 +1,9 @@
 ﻿using AutoMapper;
+using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using moviesApi.Data;
 using moviesApi.Data.Dto;
+using moviesApi.Data.Dtos;
 using moviesApi.Models;
 
 namespace moviesApi.Controllers;
@@ -36,22 +38,82 @@ public class MovieController: ControllerBase
     }
 
     [HttpGet]
-    public IEnumerable<Movie> GetMovies([FromQuery] int page=0, [FromQuery] int pageSize = 10)
+    public IEnumerable<ReadMovieDto> GetMovies([FromQuery] int page=0, [FromQuery] int pageSize = 10)
     {
-        return movies.Skip(pageSize * page).Take(pageSize);
+        return _mapper.Map<List<ReadMovieDto>>(_context.Movies.Skip(pageSize * page).Take(pageSize));
             
     }
 
     [HttpGet("{id}")]
     public IActionResult GetMovieById(int id)
     {
-        var movie = movies.FirstOrDefault(movie => movie.Id == id);
+        var movie = _context.Movies.FirstOrDefault(movie => movie.Id == id);
+        
         if (movie == null)
         {
             return NotFound();
         }
 
-        return Ok(movie);
+        var readMovieDto = _mapper.Map<ReadMovieDto>(movie);
+
+        return Ok(readMovieDto);
+
+    }
+
+    [HttpPut("{id}")]
+    public IActionResult UpdateMovie(int id, [FromBody] UpdateMovieDto movieDto)
+    {
+        var movie = _context.Movies.FirstOrDefault(movie => movie.Id == id);
+      
+        if (movie == null)
+        {
+            return NotFound();
+        }
+        _mapper.Map(movieDto, movie);      
+        _context.SaveChanges();
+        return NoContent();
+        
+    }
+
+    [HttpPatch("{id}")]
+    public IActionResult UpdateMoviePartially(int id, JsonPatchDocument<UpdateMovieDto> patch)
+    {
+        var movie = _context.Movies.FirstOrDefault(movie => movie.Id == id);
+
+        if (movie == null)
+        {
+            return NotFound();
+        }
+
+        var movieToUpdate = _mapper.Map<UpdateMovieDto>(movie);
+
+        patch.ApplyTo(movieToUpdate, ModelState);
+        
+        if (!TryValidateModel(movieToUpdate))
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        _mapper.Map(movieToUpdate, movie);
+        _context.SaveChanges();
+        return NoContent();
+
+    }
+
+    [HttpDelete("{id}")]
+    public IActionResult DeleteMovie(int id)
+    {
+        var movie = _context.Movies.FirstOrDefault(movie => movie.Id == id);
+
+        if (movie == null)
+        {
+            return NotFound();
+        }
+
+        var readMovieDto = _mapper.Map<ReadMovieDto>(movie);
+        _context.Remove(movie);
+        _context.SaveChanges();
+        return Ok(readMovieDto);
 
     }
 
